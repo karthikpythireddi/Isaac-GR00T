@@ -343,6 +343,94 @@ MODALITY_CONFIGS = {
             ],
         ),
     },
+    ##### new_embodiment: GR1ArmsAndWaistFourierHands — tabletop sim tasks #####
+    # Used instead of "gr1" to avoid conflicting with pretrained model's gr1 statistics
+    "new_embodiment": {
+        "video": ModalityConfig(
+            delta_indices=[0],
+            modality_keys=["ego_view"],
+        ),
+        "state": ModalityConfig(
+            delta_indices=[0],
+            modality_keys=[
+                "left_arm",
+                "left_hand",
+                "left_leg",
+                "neck",
+                "right_arm",
+                "right_hand",
+                "right_leg",
+                "waist",
+            ],
+        ),
+        "action": ModalityConfig(
+            delta_indices=list(range(16)),
+            modality_keys=[
+                "left_arm",
+                "left_hand",
+                "left_leg",
+                "neck",
+                "right_arm",
+                "right_hand",
+                "right_leg",
+                "waist",
+            ],
+            action_configs=[
+                # left_arm
+                ActionConfig(
+                    rep=ActionRepresentation.RELATIVE,
+                    type=ActionType.NON_EEF,
+                    format=ActionFormat.DEFAULT,
+                ),
+                # left_hand (Fourier hands — absolute)
+                ActionConfig(
+                    rep=ActionRepresentation.ABSOLUTE,
+                    type=ActionType.NON_EEF,
+                    format=ActionFormat.DEFAULT,
+                ),
+                # left_leg (stationary in tabletop — absolute)
+                ActionConfig(
+                    rep=ActionRepresentation.ABSOLUTE,
+                    type=ActionType.NON_EEF,
+                    format=ActionFormat.DEFAULT,
+                ),
+                # neck (stationary in tabletop — absolute)
+                ActionConfig(
+                    rep=ActionRepresentation.ABSOLUTE,
+                    type=ActionType.NON_EEF,
+                    format=ActionFormat.DEFAULT,
+                ),
+                # right_arm
+                ActionConfig(
+                    rep=ActionRepresentation.RELATIVE,
+                    type=ActionType.NON_EEF,
+                    format=ActionFormat.DEFAULT,
+                ),
+                # right_hand (Fourier hands — absolute)
+                ActionConfig(
+                    rep=ActionRepresentation.ABSOLUTE,
+                    type=ActionType.NON_EEF,
+                    format=ActionFormat.DEFAULT,
+                ),
+                # right_leg (stationary in tabletop — absolute)
+                ActionConfig(
+                    rep=ActionRepresentation.ABSOLUTE,
+                    type=ActionType.NON_EEF,
+                    format=ActionFormat.DEFAULT,
+                ),
+                # waist (near-stationary in tabletop — absolute)
+                ActionConfig(
+                    rep=ActionRepresentation.ABSOLUTE,
+                    type=ActionType.NON_EEF,
+                    format=ActionFormat.DEFAULT,
+                ),
+            ],
+        ),
+        "language": ModalityConfig(
+            delta_indices=[0],
+            modality_keys=["annotation.human.coarse_action"],
+        ),
+    },
 }
 
 
