@@ -17,7 +17,8 @@ import h5py
 def merge(input_paths: list[str], output_path: str):
     total_pairs = 0
     counts = {"success_vs_failure": 0, "efficiency": 0,
-               "reward_comparison": 0, "noise_injection": 0}
+               "reward_comparison": 0, "noise_injection": 0,
+               "demo_vs_failure": 0}
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
@@ -44,12 +45,14 @@ def merge(input_paths: list[str], output_path: str):
         meta.attrs["n_efficiency"]         = counts["efficiency"]
         meta.attrs["n_reward_comparison"]  = counts["reward_comparison"]
         meta.attrs["n_noise_injection"]    = counts["noise_injection"]
+        meta.attrs["n_demo_vs_failure"]    = counts["demo_vs_failure"]
 
     print(f"\nMerged {total_pairs} pairs -> {output_path}")
     print(f"  success_vs_failure: {counts['success_vs_failure']}")
     print(f"  efficiency:         {counts['efficiency']}")
     print(f"  reward_comparison:  {counts['reward_comparison']}")
     print(f"  noise_injection:    {counts['noise_injection']}")
+    print(f"  demo_vs_failure:    {counts['demo_vs_failure']}")
 
 
 def main():

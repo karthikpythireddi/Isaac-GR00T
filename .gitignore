@@ -152,6 +152,10 @@ logs_*/
 # Git worktrees
 /wt
 
+# Preference data & demo data (large binary files)
+preference_data/
+/examples/robocasa-gr1-tabletop-tasks/gr1_finetune_data/
+
 # General project data / artifacts
 episode_data/
 third_parties/

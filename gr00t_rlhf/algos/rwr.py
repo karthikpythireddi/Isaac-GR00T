@@ -29,10 +29,11 @@ from gr00t.model.gr00t_n1d6.gr00t_n1d6 import Gr00tN1d6
 from gr00t_rlhf.datasets import GR00TPreferenceDataset, make_preference_collator
 
 
-EMBODIMENT_TAG = "new_embodiment"
+# GR1 embodiment: matches the base pretrained GR00T-N1.6-3B model config
+# and the 400-pair preference data collected with --embodiment-tag GR1.
+EMBODIMENT_TAG = "gr1"
 VIDEO_KEYS  = ["ego_view"]
-STATE_KEYS  = ["left_arm", "left_hand", "left_leg", "neck",
-               "right_arm", "right_hand", "right_leg", "waist"]
+STATE_KEYS  = ["left_arm", "right_arm", "left_hand", "right_hand", "waist"]
 ACTION_KEYS = STATE_KEYS
 
 

@@ -17,9 +17,8 @@ Prerequisites:
   1. Start the GR00T inference server WITH --use-sim-policy-wrapper:
        conda run -n groot python gr00t/eval/run_gr00t_server.py \\
            --model-path nvidia/GR00T-N1.6-3B \\
-           --embodiment-tag gr1 \\
+           --embodiment-tag NEW_EMBODIMENT \\
            --use-sim-policy-wrapper \\
-           --denoising-steps 4 \\
            --port 5555
 
   2. Install RoboCasa GR1 sim env in gr1_sim conda env:
@@ -125,8 +124,26 @@ def rollout(vec_env, policy: PolicyClient, seed: int,
             # obs[k] shape: (B=1, T=1, ...) for video/state
             traj_obs[k].append(obs[k][0, 0])
 
+        # Pass observations directly — the Gr00tSimPolicyWrapper on the server
+        # handles key remapping for the active embodiment tag.
+        # For GR1: keeps full video key (ego_view_bg_crop_pad_res256_freq20)
+        # For NEW_EMBODIMENT: the wrapper remaps to short key (ego_view)
+        policy_obs = dict(obs)
+
+        # Pad missing state keys that the model expects but the env doesn't
+        # provide (e.g. legs/neck for GR1ArmsAndWaist envs with NEW_EMBODIMENT).
+        # Shapes follow (B=1, T=1, D) convention from MultiStepWrapper.
+        _missing_states = {
+            "state.left_leg": np.zeros((1, 1, 6), dtype=np.float32),
+            "state.right_leg": np.zeros((1, 1, 6), dtype=np.float32),
+            "state.neck": np.zeros((1, 1, 3), dtype=np.float32),
+        }
+        for mk, mv in _missing_states.items():
+            if mk not in policy_obs:
+                policy_obs[mk] = mv
+
         # Query policy — obs has B=1 batch dim as expected by Gr00tSimPolicyWrapper
-        actions, _info = policy.get_action(obs)
+        actions, _info = policy.get_action(policy_obs)
         # actions: {action.key: (B=1, T=n_action_steps, D)}
 
         # Record all action steps for each key — shape per entry: (T_chunk, D)
@@ -231,8 +248,11 @@ def collect_preferences(
 
     seed = seed_offset
     while len(pairs) < n_pairs:
+        print(f"  [rollout] seed={seed}/{seed+1} — collecting pair attempt {len(pairs)+1}/{n_pairs} ...", flush=True)
         traj_a = rollout(vec_env, policy, seed=seed)
+        print(f"    traj_a: len={traj_a['length']}, success={traj_a['success']}, reward={traj_a['cumulative_reward']:.3f}", flush=True)
         traj_b = rollout(vec_env, policy, seed=seed + 1)
+        print(f"    traj_b: len={traj_b['length']}, success={traj_b['success']}, reward={traj_b['cumulative_reward']:.3f}", flush=True)
         seed += 2
 
         # Determine winner / loser
@@ -304,7 +324,8 @@ def collect_preferences(
         print(
             f"  pair {len(pairs)}/{n_pairs} | "
             f"seed={seed-2}/{seed-1} | "
-            f"type={pref_type} | {extra}"
+            f"type={pref_type} | {extra}",
+            flush=True,
         )
 
     print(
@@ -413,9 +434,8 @@ def main():
         "IMPORTANT: GR00T server must be started with --use-sim-policy-wrapper\n"
         "  conda run -n groot python gr00t/eval/run_gr00t_server.py \\\n"
         "      --model-path nvidia/GR00T-N1.6-3B \\\n"
-        "      --embodiment-tag gr1 \\\n"
+        "      --embodiment-tag NEW_EMBODIMENT \\\n"
         "      --use-sim-policy-wrapper \\\n"
-        "      --denoising-steps 4 \\\n"
         "      --port 5555\n"
     )
 

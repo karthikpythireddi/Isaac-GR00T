@@ -97,13 +97,22 @@ def make_preference_collator(
             "annotation.human.coarse_action": "perform the task",
         }
         for k in video_keys:
-            if k in obs_step:
-                inp[f"video.{k}"] = obs_step[k]
+            # HDF5 keys may be prefixed ("video.ego_view_*") or bare ("ego_view")
+            for ok, ov in obs_step.items():
+                if ok == k or ok == f"video.{k}" or ok.startswith(f"video.{k}"):
+                    inp[f"video.{k}"] = ov
+                    break
         for k in state_keys:
-            if k in obs_step:
+            key_with_prefix = f"state.{k}"
+            if key_with_prefix in obs_step:
+                inp[f"state.{k}"] = obs_step[key_with_prefix]
+            elif k in obs_step:
                 inp[f"state.{k}"] = obs_step[k]
         for k in action_keys:
-            if k in act_step:
+            key_with_prefix = f"action.{k}"
+            if key_with_prefix in act_step:
+                inp[f"action.{k}"] = act_step[key_with_prefix]
+            elif k in act_step:
                 inp[f"action.{k}"] = act_step[k]
         return inp
 
