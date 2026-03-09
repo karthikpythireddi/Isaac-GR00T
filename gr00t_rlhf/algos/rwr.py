@@ -88,8 +88,12 @@ def train_rwr(
     policy = Gr00tN1d6.from_pretrained(model_path, torch_dtype=torch.bfloat16).to(device)
     policy.train()
 
+    print("[RWR] Loading processor for data pipeline")
+    from transformers import AutoProcessor
+    processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
+
     dataset  = GR00TPreferenceDataset(hdf5_path, n_windows_per_pair=n_windows_per_pair)
-    collator = make_preference_collator(EMBODIMENT_TAG, ACTION_KEYS, STATE_KEYS, VIDEO_KEYS)
+    collator = make_preference_collator(EMBODIMENT_TAG, ACTION_KEYS, STATE_KEYS, VIDEO_KEYS, processor=processor)
     loader   = DataLoader(dataset, batch_size=batch_size, shuffle=True,
                           collate_fn=collator, num_workers=0, drop_last=True)
 

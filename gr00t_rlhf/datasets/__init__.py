@@ -2,7 +2,8 @@
 Preference dataset for GR00T DPO/RWR training.
 
 Loads (winner, loser) trajectory pairs from HDF5 files produced by
-collect_preferences_groot.py and converts them to GR00T model inputs.
+collect_preferences_groot.py and converts them to GR00T model inputs
+using the model's own AutoProcessor for proper VLM processing.
 """
 
 import random
@@ -12,6 +13,9 @@ import h5py
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+
+from gr00t.data.embodiment_tags import EmbodimentTag
+from gr00t.data.types import VLAStepData
 
 
 class GR00TPreferenceDataset(Dataset):
@@ -75,66 +79,92 @@ def _sample_window(obs: dict, actions: dict) -> tuple[dict, dict]:
     return obs_step, act_step
 
 
+def _build_vla_step(obs_step: dict, act_step: dict, state_keys: list,
+                    action_keys: list, video_keys: list) -> VLAStepData:
+    """Convert a sampled window into VLAStepData for the GR00T processor."""
+    # Build images dict: view_name -> list[np.ndarray (H, W, 3)]
+    images = {}
+    for k in video_keys:
+        for ok, ov in obs_step.items():
+            if ok == k or ok == f"video.{k}" or ok.startswith(f"video.{k}"):
+                # ov shape: (1, H, W, 3) -> list of (H, W, 3)
+                if ov.ndim == 4:
+                    images[k] = [ov[i] for i in range(ov.shape[0])]
+                else:
+                    images[k] = [ov]
+                break
+
+    # Build states dict: state_name -> np.ndarray (D,)
+    states = {}
+    for k in state_keys:
+        key_with_prefix = f"state.{k}"
+        if key_with_prefix in obs_step:
+            states[k] = obs_step[key_with_prefix].astype(np.float64)
+        elif k in obs_step:
+            states[k] = obs_step[k].astype(np.float64)
+
+    # Build actions dict: action_name -> np.ndarray (horizon, D)
+    actions = {}
+    for k in action_keys:
+        key_with_prefix = f"action.{k}"
+        if key_with_prefix in act_step:
+            actions[k] = act_step[key_with_prefix].astype(np.float64)
+        elif k in act_step:
+            actions[k] = act_step[k].astype(np.float64)
+
+    return VLAStepData(
+        images=images,
+        states=states,
+        actions=actions,
+        text="perform the task",
+        embodiment=EmbodimentTag.GR1,
+    )
+
+
 def make_preference_collator(
     embodiment_tag: str,
     action_keys: list,
     state_keys: list,
     video_keys: list,
+    processor=None,
 ):
     """
     Returns a collate_fn that converts raw preference samples into
-    GR00T model input dicts with keys:
-        video.{key}  : (B, 1, H, W, 3) uint8
-        state.{key}  : (B, D) float32
-        action.{key} : (B, n_action_steps, D) float32
-        annotation.human.coarse_action : list[str]
-        embodiment_tag : str
+    GR00T model input dicts using the model's AutoProcessor.
+
+    If processor is provided, uses it for proper VLM processing.
+    Otherwise falls back to simple tensor stacking (for testing only).
     """
+    if processor is None:
+        raise ValueError(
+            "processor is required. Load it with: "
+            "AutoProcessor.from_pretrained(model_path)"
+        )
 
-    def _build_inputs(obs_step: dict, act_step: dict) -> dict:
-        inp = {
-            "embodiment_tag": embodiment_tag,
-            "annotation.human.coarse_action": "perform the task",
-        }
-        for k in video_keys:
-            # HDF5 keys may be prefixed ("video.ego_view_*") or bare ("ego_view")
-            for ok, ov in obs_step.items():
-                if ok == k or ok == f"video.{k}" or ok.startswith(f"video.{k}"):
-                    inp[f"video.{k}"] = ov
-                    break
-        for k in state_keys:
-            key_with_prefix = f"state.{k}"
-            if key_with_prefix in obs_step:
-                inp[f"state.{k}"] = obs_step[key_with_prefix]
-            elif k in obs_step:
-                inp[f"state.{k}"] = obs_step[k]
-        for k in action_keys:
-            key_with_prefix = f"action.{k}"
-            if key_with_prefix in act_step:
-                inp[f"action.{k}"] = act_step[key_with_prefix]
-            elif k in act_step:
-                inp[f"action.{k}"] = act_step[k]
-        return inp
+    # Get the data collator from the processor
+    data_collator = processor.collator
 
-    def _stack(inputs_list: list) -> dict:
-        stacked = {}
-        for key in inputs_list[0]:
-            if key in ("embodiment_tag", "annotation.human.coarse_action"):
-                stacked[key] = [s[key] for s in inputs_list]
-            else:
-                vals = [s[key] for s in inputs_list if key in s]
-                if vals:
-                    stacked[key] = torch.from_numpy(np.stack(vals, axis=0))
-        return stacked
+    def _process_sample(obs_step, act_step):
+        """Process a single sample through the GR00T processor."""
+        vla_step = _build_vla_step(obs_step, act_step, state_keys, action_keys, video_keys)
+        messages = [{"type": "episode_step", "content": vla_step}]
+        processed = processor(messages)
+        return processed
 
     def collate_fn(batch: list) -> dict:
-        winner_inputs, loser_inputs = [], []
+        winner_processed, loser_processed = [], []
         for sample in batch:
-            for traj_type, inp_list in [("winner", winner_inputs), ("loser", loser_inputs)]:
+            for traj_type, proc_list in [("winner", winner_processed), ("loser", loser_processed)]:
                 obs_step, act_step = _sample_window(
                     sample[f"{traj_type}_obs"], sample[f"{traj_type}_actions"]
                 )
-                inp_list.append(_build_inputs(obs_step, act_step))
-        return {"winner": _stack(winner_inputs), "loser": _stack(loser_inputs)}
+                processed = _process_sample(obs_step, act_step)
+                proc_list.append(processed)
+
+        # Use the model's own collator to batch the processed samples
+        winner_batch = data_collator(winner_processed)["inputs"]
+        loser_batch = data_collator(loser_processed)["inputs"]
+
+        return {"winner": winner_batch, "loser": loser_batch}
 
     return collate_fn
