@@ -72,26 +72,40 @@ def make_env_fn(env_name: str, max_episode_steps: int, video_dir: str = None):
     return _make
 
 
-def rename_latest_video(video_dir: str, ep: int, success: bool, known_files: set):
-    """Rename the latest video file to include episode number and outcome."""
-    if video_dir is None:
+def rename_videos_after_eval(video_dir: str, results: list):
+    """Rename video files to include episode number and outcome.
+    Must be called AFTER vec_env.close() so all files are finalized.
+
+    VideoRecordingWrapper names files: <uuid>_s1.mp4 (success) / <uuid>_s0.mp4 (fail)
+    We sort by modification time to match episode order and prepend ep##_STATUS_.
+    """
+    if video_dir is None or not os.path.isdir(video_dir):
         return
-    current_files = set(glob.glob(os.path.join(video_dir, "*.mp4")))
-    new_files = current_files - known_files
-    for fpath in new_files:
-        basename = os.path.basename(fpath)
-        status = "SUCCESS" if success else "FAIL"
-        new_name = f"ep{ep:02d}_{status}_{basename}"
-        new_path = os.path.join(video_dir, new_name)
-        os.rename(fpath, new_path)
-        known_files.add(new_path)
+    videos = sorted(glob.glob(os.path.join(video_dir, "*.mp4")),
+                    key=os.path.getmtime)
+    # The final reset() creates an extra incomplete video file — remove it
+    if len(videos) == len(results) + 1:
+        extra = videos[-1]
+        try:
+            os.remove(extra)
+            videos = videos[:-1]
+        except OSError:
+            pass
+    if len(videos) != len(results):
+        print(f"  Warning: {len(videos)} videos but {len(results)} episodes, skipping rename")
+        return
+    for vid_path, ep_result in zip(videos, results):
+        basename = os.path.basename(vid_path)
+        if basename.startswith("ep"):  # already renamed
+            continue
+        status = "SUCCESS" if ep_result["success"] else "FAIL"
+        new_name = f"ep{ep_result['episode']:02d}_{status}_{basename}"
+        os.rename(vid_path, os.path.join(video_dir, new_name))
 
 
-def evaluate(vec_env, policy: PolicyClient, n_episodes: int, max_steps: int,
-             video_dir: str = None):
+def evaluate(vec_env, policy: PolicyClient, n_episodes: int, max_steps: int):
     """Run n_episodes and collect success/reward/length stats."""
     results = []
-    known_files = set(glob.glob(os.path.join(video_dir, "*.mp4"))) if video_dir else set()
 
     for ep in range(n_episodes):
         seed = ep * 7 + 42  # deterministic but spread out
@@ -141,9 +155,6 @@ def evaluate(vec_env, policy: PolicyClient, n_episodes: int, max_steps: int,
             "length": length,
             "cumulative_reward": cumulative_reward,
         })
-
-        # Rename video to include episode number and outcome
-        rename_latest_video(video_dir, ep, success, known_files)
 
         status = "SUCCESS" if success else "FAIL"
         print(
@@ -206,9 +217,18 @@ def main():
     )
     policy = PolicyClient(host=args.host, port=args.port, strict=False)
 
-    results = evaluate(vec_env, policy, args.n_episodes, args.max_steps,
-                       video_dir=video_dir)
+    results = evaluate(vec_env, policy, args.n_episodes, args.max_steps)
+
+    # One final reset to flush the last episode's video
+    # (VideoRecordingWrapper finalizes videos in reset(), not close())
+    try:
+        vec_env.reset()
+    except Exception:
+        pass
     vec_env.close()
+
+    # Rename videos after env is closed (files finalized by PyAV)
+    rename_videos_after_eval(video_dir, results)
 
     summary = summarize(results, task_name)
 
