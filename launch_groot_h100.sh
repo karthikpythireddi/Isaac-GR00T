@@ -52,8 +52,8 @@ DEMO_DIRS["PosttrainPnPNovelFromPlateToBowlSplitA"]="gr1_unified.PosttrainPnPNov
 DEMO_DIRS["PosttrainPnPNovelFromTrayToPotSplitA"]="gr1_unified.PosttrainPnPNovelFromTrayToPotSplitA"
 # ------------------------------------------------------------------------------
 
-export MUJOCO_GL=${MUJOCO_GL:-egl}
-export PYOPENGL_PLATFORM=${PYOPENGL_PLATFORM:-egl}
+export MUJOCO_GL=osmesa
+export PYOPENGL_PLATFORM=osmesa
 
 echo "============================================================"
 echo " GR00T RLHF Pipeline (H100)"
@@ -210,7 +210,6 @@ step_eval() {
                 --host localhost \
                 --port $((SERVER_PORT + 10)) \
                 --n_episodes 20 \
-                --record_video \
                 --output_dir "$EVAL_OUTPUT/$LABEL/$TASK" || \
             echo "[eval] eval failed for $LABEL/$TASK"
         done
@@ -227,15 +226,6 @@ step_eval() {
         --eval_dir "$EVAL_OUTPUT" \
         --model_order base dpo rwr ppo 2>/dev/null || \
     echo "[eval] Run scripts/print_eval_summary.py manually to see table."
-
-    echo "[eval] Creating comparison montage figures..."
-    python scripts/make_eval_montage.py \
-        --eval_dir "$EVAL_OUTPUT" \
-        --output_dir outputs/figures \
-        --model_order base dpo rwr ppo \
-        --n_frames 6 2>/dev/null || \
-    echo "[eval] Run scripts/make_eval_montage.py manually to create figures."
-
     echo "[eval] Full results in: $EVAL_OUTPUT"
 }
 
