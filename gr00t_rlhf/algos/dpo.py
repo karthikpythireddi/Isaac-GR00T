@@ -82,8 +82,14 @@ def train_dpo(
 
     print(f"[DPO] Loading policy from {model_path}")
     policy = Gr00tN1d6.from_pretrained(model_path, torch_dtype=torch.bfloat16).to(device)
-    # Cast backbone to bf16 (incl LayerNorm) for FlashAttention; keep action head mixed-precision
-    policy.backbone.to(dtype=torch.bfloat16)
+    policy.backbone.to(dtype=torch.bfloat16)  # LayerNorm bf16 for FlashAttention
+    # Fix Beta distribution: Dirichlet sampling doesn't support bf16
+    from torch.distributions import Beta
+    ah = policy.action_head
+    ah.beta_dist = Beta(
+        torch.tensor(float(ah.config.noise_beta_alpha)),
+        torch.tensor(float(ah.config.noise_beta_beta)),
+    )
     policy.train()
 
     print("[DPO] Loading processor for data pipeline")

@@ -146,6 +146,12 @@ def train_ppo(
     print(f"[PPO] Loading policy from {model_path}")
     policy = Gr00tN1d6.from_pretrained(model_path, torch_dtype=torch.bfloat16).to(device)
     policy.backbone.to(dtype=torch.bfloat16)
+    from torch.distributions import Beta
+    ah = policy.action_head
+    ah.beta_dist = Beta(
+        torch.tensor(float(ah.config.noise_beta_alpha)),
+        torch.tensor(float(ah.config.noise_beta_beta)),
+    )
     policy.train()
 
     print("[PPO] Loading processor for data pipeline")
