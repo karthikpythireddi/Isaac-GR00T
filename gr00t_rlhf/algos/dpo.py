@@ -36,9 +36,13 @@ ACTION_KEYS = STATE_KEYS
 
 def compute_flow_loss(model: Gr00tN1d6, batch: dict, device: str) -> torch.Tensor:
     """Forward pass; returns per-sample flow-matching loss, shape (B,)."""
-    # Filter out non-tensor values (e.g. embodiment_tag strings) to avoid
-    # tree.map_structure errors in model.prepare_input
-    inputs = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
+    # Move tensors to device; keep vlm_content (list) as-is for model.prepare_input
+    inputs = {}
+    for k, v in batch.items():
+        if isinstance(v, torch.Tensor):
+            inputs[k] = v.to(device)
+        elif k == "vlm_content":
+            inputs[k] = v  # model.prepare_input handles this
     out = model(inputs)
     action_loss = out["action_loss"]   # (B, H, D)
     action_mask = out["action_mask"]   # (B, H, D)

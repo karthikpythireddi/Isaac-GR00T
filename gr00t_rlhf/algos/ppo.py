@@ -54,7 +54,8 @@ class RewardModel(nn.Module):
             p.requires_grad_(False)
 
     def compute_flow_loss(self, batch: dict, device: str) -> torch.Tensor:
-        inputs = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
+        inputs = {k: (v.to(device) if isinstance(v, torch.Tensor) else v)
+                  for k, v in batch.items() if isinstance(v, torch.Tensor) or k == "vlm_content"}
         out = self.model(inputs)
         action_loss = out["action_loss"]
         action_mask = out["action_mask"]

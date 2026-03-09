@@ -151,9 +151,6 @@ def make_preference_collator(
             "AutoProcessor.from_pretrained(model_path)"
         )
 
-    # Get the data collator from the processor
-    data_collator = processor.collator
-
     # Build mapping from bare video key (e.g. "ego_view") to the processor's
     # full modality key (e.g. "ego_view_bg_crop_pad_res256_freq20")
     proc_video_keys = processor.modality_configs[embodiment_tag]["video"].modality_keys
@@ -182,6 +179,25 @@ def make_preference_collator(
         processed = processor(messages)
         return processed
 
+    def _manual_batch(processed_list: list) -> dict:
+        """Batch processed samples manually, keeping vlm_content for model to handle."""
+        batch = {}
+        keys = set()
+        for p in processed_list:
+            keys.update(p.keys())
+        for key in keys:
+            values = [p[key] for p in processed_list if key in p]
+            if key == "vlm_content":
+                # Keep vlm_content as a list — model.prepare_input will process it
+                batch["vlm_content"] = values
+            elif isinstance(values[0], torch.Tensor):
+                batch[key] = torch.stack(values)
+            elif isinstance(values[0], (int, float, np.integer, np.floating)):
+                batch[key] = torch.tensor(values)
+            elif isinstance(values[0], np.ndarray):
+                batch[key] = torch.from_numpy(np.stack(values))
+        return batch
+
     def collate_fn(batch: list) -> dict:
         winner_processed, loser_processed = [], []
         for sample in batch:
@@ -192,10 +208,7 @@ def make_preference_collator(
                 processed = _process_sample(obs_step, act_step)
                 proc_list.append(processed)
 
-        # Use the model's own collator to batch the processed samples
-        winner_batch = data_collator(winner_processed)["inputs"]
-        loser_batch = data_collator(loser_processed)["inputs"]
-
-        return {"winner": winner_batch, "loser": loser_batch}
+        return {"winner": _manual_batch(winner_processed),
+                "loser": _manual_batch(loser_processed)}
 
     return collate_fn
