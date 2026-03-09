@@ -23,6 +23,7 @@ Usage:
 import argparse
 import json
 import os
+from pathlib import Path
 
 import gymnasium as gym
 import numpy as np
@@ -41,9 +42,23 @@ from gr00t.policy.server_client import PolicyClient
 N_ACTION_STEPS = 8
 
 
-def make_env_fn(env_name: str, max_episode_steps: int):
+def make_env_fn(env_name: str, max_episode_steps: int, video_dir: str = None):
     def _make():
         env = gym.make(env_name, enable_render=True)
+        if video_dir is not None:
+            from gr00t.eval.sim.wrapper.video_recording_wrapper import (
+                VideoRecorder,
+                VideoRecordingWrapper,
+            )
+            video_recorder = VideoRecorder.create_h264(fps=30, crf=22)
+            env = VideoRecordingWrapper(
+                env,
+                video_recorder,
+                video_dir=Path(video_dir),
+                steps_per_render=1,
+                max_episode_steps=max_episode_steps,
+                overlay_text=False,
+            )
         env = MultiStepWrapper(
             env,
             video_delta_indices=np.array([0]),
@@ -148,6 +163,8 @@ def main():
     parser.add_argument("--n_episodes", type=int, default=20)
     parser.add_argument("--max_steps", type=int, default=600)
     parser.add_argument("--output_dir", default="outputs/eval")
+    parser.add_argument("--record_video", action="store_true",
+                        help="Record rollout videos for each episode")
     args = parser.parse_args()
 
     task_name = args.env_name.split("/")[-1]
@@ -157,8 +174,14 @@ def main():
     print(f"Episodes: {args.n_episodes}")
     print(f"{'='*60}\n")
 
+    video_dir = None
+    if args.record_video:
+        video_dir = os.path.join(args.output_dir, "videos")
+        os.makedirs(video_dir, exist_ok=True)
+        print(f"Recording videos to: {video_dir}")
+
     vec_env = gym.vector.SyncVectorEnv(
-        [make_env_fn(args.env_name, args.max_steps)]
+        [make_env_fn(args.env_name, args.max_steps, video_dir=video_dir)]
     )
     policy = PolicyClient(host=args.host, port=args.port, strict=False)
 
