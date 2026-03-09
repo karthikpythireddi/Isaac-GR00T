@@ -20,6 +20,13 @@
 # =============================================================================
 set -e
 
+# Trap to clean up server on unexpected exit
+cleanup() {
+    echo "[cleanup] Killing any lingering GR00T servers..."
+    pkill -f run_gr00t_server 2>/dev/null || true
+}
+trap cleanup EXIT
+
 STEP=${1:-"all"}
 
 # ---- Config ------------------------------------------------------------------
@@ -176,6 +183,9 @@ step_ppo() {
 
 # ---- Evaluation: all checkpoints side-by-side --------------------------------
 step_eval() {
+    # Disable set -e inside eval so one task failure doesn't kill the whole run
+    set +e
+
     echo "[eval] Evaluating all checkpoints..."
     echo "[eval] Chain: Base → DPO / RWR / PPO"
 
@@ -195,18 +205,46 @@ step_eval() {
             continue
         fi
 
+        # ---- Check if this model is already fully evaluated ----
+        ALL_DONE=true
+        for ENV in "${EVAL_ENVS[@]}"; do
+            TASK=$(echo "$ENV" | cut -d'/' -f2)
+            RESULTS_FILE="$EVAL_OUTPUT/$LABEL/$TASK/eval_results.json"
+            VIDEO_DIR="$EVAL_OUTPUT/$LABEL/$TASK/videos"
+            if [ ! -f "$RESULTS_FILE" ] || [ ! -d "$VIDEO_DIR" ]; then
+                ALL_DONE=false
+                break
+            fi
+            # Check we have all 20 videos
+            N_VIDS=$(find "$VIDEO_DIR" -name "*.mp4" 2>/dev/null | wc -l)
+            if [ "$N_VIDS" -lt 20 ]; then
+                ALL_DONE=false
+                break
+            fi
+        done
+        if [ "$ALL_DONE" = true ]; then
+            echo "[eval] $LABEL already fully evaluated (all tasks + videos). Skipping."
+            continue
+        fi
+
         # ---- Ensure no lingering server on the eval port ----
         echo "[eval] --- $LABEL ---"
         echo "[eval] Cleaning up any previous server on port $EVAL_PORT..."
-        pkill -f "run_gr00t_server.*--port $EVAL_PORT" 2>/dev/null || true
+        pkill -f run_gr00t_server 2>/dev/null || true
         # Wait for port to be fully released
-        for i in $(seq 1 12); do
+        for i in $(seq 1 15); do
             if ! ss -tlnp 2>/dev/null | grep -q ":$EVAL_PORT "; then
                 echo "[eval] Port $EVAL_PORT is free."
                 break
             fi
-            echo "[eval] Port $EVAL_PORT still in use, waiting... ($i/12)"
-            sleep 5
+            if [ "$i" -eq 15 ]; then
+                echo "[eval] WARNING: Port $EVAL_PORT still in use after 75s! Force killing..."
+                fuser -k $EVAL_PORT/tcp 2>/dev/null || true
+                sleep 5
+            else
+                echo "[eval] Port $EVAL_PORT still in use, waiting... ($i/15)"
+                sleep 5
+            fi
         done
 
         # ---- Start server for this model ----
@@ -225,11 +263,29 @@ step_eval() {
             echo "[eval] ERROR: Server for $LABEL failed to start! Skipping."
             continue
         fi
-        echo "[eval] Server is running."
+        echo "[eval] Server is running (PID $EVAL_SERVER_PID)."
 
         # ---- Run eval on all tasks ----
         for ENV in "${EVAL_ENVS[@]}"; do
             TASK=$(echo "$ENV" | cut -d'/' -f2)
+
+            # Skip tasks already completed with videos
+            RESULTS_FILE="$EVAL_OUTPUT/$LABEL/$TASK/eval_results.json"
+            VIDEO_DIR="$EVAL_OUTPUT/$LABEL/$TASK/videos"
+            if [ -f "$RESULTS_FILE" ] && [ -d "$VIDEO_DIR" ]; then
+                N_VIDS=$(find "$VIDEO_DIR" -name "*.mp4" 2>/dev/null | wc -l)
+                if [ "$N_VIDS" -ge 20 ]; then
+                    echo "[eval] $LABEL / $TASK already done (20 videos). Skipping."
+                    continue
+                fi
+            fi
+
+            # Verify server is still alive before each task
+            if ! kill -0 $EVAL_SERVER_PID 2>/dev/null; then
+                echo "[eval] ERROR: Server died during $LABEL eval! Breaking."
+                break
+            fi
+
             echo "[eval] $LABEL / $TASK"
             python scripts/eval_policy.py \
                 --env_name "$ENV" \
@@ -237,8 +293,10 @@ step_eval() {
                 --port $EVAL_PORT \
                 --n_episodes 20 \
                 --output_dir "$EVAL_OUTPUT/$LABEL/$TASK" \
-                --record_video || \
-            echo "[eval] eval failed for $LABEL/$TASK"
+                --record_video
+            if [ $? -ne 0 ]; then
+                echo "[eval] WARNING: eval failed for $LABEL/$TASK — continuing with next task"
+            fi
         done
 
         # ---- Stop server and wait for port release ----
@@ -246,8 +304,10 @@ step_eval() {
         kill $EVAL_SERVER_PID 2>/dev/null || true
         wait $EVAL_SERVER_PID 2>/dev/null || true
         echo "[eval] Waiting for port $EVAL_PORT to be released..."
-        sleep 10
+        sleep 15
     done
+
+    set -e
 
     echo ""
     echo "[eval] =================================================="
