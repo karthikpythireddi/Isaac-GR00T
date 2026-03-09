@@ -68,7 +68,12 @@ class RewardModel(nn.Module):
 
 def compute_flow_loss(model: Gr00tN1d6, batch: dict, device: str) -> torch.Tensor:
     """Forward pass; returns per-sample flow-matching loss, shape (B,)."""
-    inputs = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
+    inputs = {}
+    for k, v in batch.items():
+        if isinstance(v, torch.Tensor):
+            inputs[k] = v.to(device)
+        elif k == "vlm_content":
+            inputs[k] = v
     out = model(inputs)
     action_loss = out["action_loss"]
     action_mask = out["action_mask"]
