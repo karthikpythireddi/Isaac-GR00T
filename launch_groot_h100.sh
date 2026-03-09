@@ -185,6 +185,8 @@ step_eval() {
     MODELS["rwr"]="$RWR_OUTPUT"
     MODELS["ppo"]="$PPO_OUTPUT"
 
+    EVAL_PORT=$((SERVER_PORT + 10))
+
     for LABEL in base dpo rwr ppo; do
         MODEL_DIR="${MODELS[$LABEL]}"
         # Skip missing RLHF checkpoints
@@ -193,29 +195,58 @@ step_eval() {
             continue
         fi
 
+        # ---- Ensure no lingering server on the eval port ----
         echo "[eval] --- $LABEL ---"
+        echo "[eval] Cleaning up any previous server on port $EVAL_PORT..."
+        pkill -f "run_gr00t_server.*--port $EVAL_PORT" 2>/dev/null || true
+        # Wait for port to be fully released
+        for i in $(seq 1 12); do
+            if ! ss -tlnp 2>/dev/null | grep -q ":$EVAL_PORT "; then
+                echo "[eval] Port $EVAL_PORT is free."
+                break
+            fi
+            echo "[eval] Port $EVAL_PORT still in use, waiting... ($i/12)"
+            sleep 5
+        done
+
+        # ---- Start server for this model ----
+        echo "[eval] Starting server for $LABEL (model: $MODEL_DIR)..."
         python gr00t/eval/run_gr00t_server.py \
             --model-path "$MODEL_DIR" \
             --embodiment-tag GR1 \
             --use-sim-policy-wrapper \
-            --port $((SERVER_PORT + 10)) &
+            --port $EVAL_PORT &
         EVAL_SERVER_PID=$!
+        echo "[eval] Server PID: $EVAL_SERVER_PID — waiting 60s for warmup..."
         sleep 60
 
+        # Verify server is actually running
+        if ! kill -0 $EVAL_SERVER_PID 2>/dev/null; then
+            echo "[eval] ERROR: Server for $LABEL failed to start! Skipping."
+            continue
+        fi
+        echo "[eval] Server is running."
+
+        # ---- Run eval on all tasks ----
         for ENV in "${EVAL_ENVS[@]}"; do
             TASK=$(echo "$ENV" | cut -d'/' -f2)
             echo "[eval] $LABEL / $TASK"
             python scripts/eval_policy.py \
                 --env_name "$ENV" \
                 --host localhost \
-                --port $((SERVER_PORT + 10)) \
+                --port $EVAL_PORT \
                 --n_episodes 20 \
-                --output_dir "$EVAL_OUTPUT/$LABEL/$TASK" || \
+                --output_dir "$EVAL_OUTPUT/$LABEL/$TASK" \
+                --record_video || \
             echo "[eval] eval failed for $LABEL/$TASK"
         done
 
+        # ---- Stop server and wait for port release ----
+        echo "[eval] Stopping $LABEL server (PID $EVAL_SERVER_PID)..."
         kill $EVAL_SERVER_PID 2>/dev/null || true
-        sleep 5
+        wait $EVAL_SERVER_PID 2>/dev/null || true
+        echo "[eval] Waiting for port $EVAL_PORT to be released..."
+        sleep 10
     done
 
     echo ""
