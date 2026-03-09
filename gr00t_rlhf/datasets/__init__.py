@@ -94,14 +94,21 @@ def _build_vla_step(obs_step: dict, act_step: dict, state_keys: list,
                     images[k] = [ov]
                 break
 
-    # Build states dict: state_name -> np.ndarray (D,)
+    # Build states dict: state_name -> np.ndarray (T, D)
+    # Processor does state[key][-1] to get reference state, so need (T, D) not (D,)
     states = {}
     for k in state_keys:
         key_with_prefix = f"state.{k}"
+        val = None
         if key_with_prefix in obs_step:
-            states[k] = np.atleast_1d(obs_step[key_with_prefix].astype(np.float64))
+            val = obs_step[key_with_prefix].astype(np.float64)
         elif k in obs_step:
-            states[k] = np.atleast_1d(obs_step[k].astype(np.float64))
+            val = obs_step[k].astype(np.float64)
+        if val is not None:
+            val = np.atleast_1d(val)
+            if val.ndim == 1:
+                val = val[np.newaxis, :]  # (D,) -> (1, D)
+            states[k] = val
 
     # Build actions dict: action_name -> np.ndarray (horizon, D)
     actions = {}
