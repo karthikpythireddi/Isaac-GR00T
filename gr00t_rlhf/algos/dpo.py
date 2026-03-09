@@ -81,8 +81,9 @@ def train_dpo(
         ))
 
     print(f"[DPO] Loading policy from {model_path}")
-    policy = Gr00tN1d6.from_pretrained(model_path, torch_dtype=torch.bfloat16)
-    policy = policy.to(device=device, dtype=torch.bfloat16)  # ensure all layers (incl LayerNorm) are bf16
+    policy = Gr00tN1d6.from_pretrained(model_path, torch_dtype=torch.bfloat16).to(device)
+    # Cast backbone to bf16 (incl LayerNorm) for FlashAttention; keep action head mixed-precision
+    policy.backbone.to(dtype=torch.bfloat16)
     policy.train()
 
     print("[DPO] Loading processor for data pipeline")
