@@ -39,8 +39,7 @@ ACTION_KEYS = STATE_KEYS
 
 def compute_flow_loss(model: Gr00tN1d6, batch: dict, device: str) -> torch.Tensor:
     """Forward pass; returns per-sample flow-matching loss, shape (B,)."""
-    inputs = {k: (v.to(device) if isinstance(v, torch.Tensor) else v)
-              for k, v in batch.items()}
+    inputs = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
     out = model(inputs)
     action_loss = out["action_loss"]   # (B, H, D)
     action_mask = out["action_mask"]   # (B, H, D)
