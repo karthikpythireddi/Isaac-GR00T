@@ -21,6 +21,7 @@ Usage:
 """
 
 import argparse
+import glob
 import json
 import os
 from pathlib import Path
@@ -71,9 +72,26 @@ def make_env_fn(env_name: str, max_episode_steps: int, video_dir: str = None):
     return _make
 
 
-def evaluate(vec_env, policy: PolicyClient, n_episodes: int, max_steps: int):
+def rename_latest_video(video_dir: str, ep: int, success: bool, known_files: set):
+    """Rename the latest video file to include episode number and outcome."""
+    if video_dir is None:
+        return
+    current_files = set(glob.glob(os.path.join(video_dir, "*.mp4")))
+    new_files = current_files - known_files
+    for fpath in new_files:
+        basename = os.path.basename(fpath)
+        status = "SUCCESS" if success else "FAIL"
+        new_name = f"ep{ep:02d}_{status}_{basename}"
+        new_path = os.path.join(video_dir, new_name)
+        os.rename(fpath, new_path)
+        known_files.add(new_path)
+
+
+def evaluate(vec_env, policy: PolicyClient, n_episodes: int, max_steps: int,
+             video_dir: str = None):
     """Run n_episodes and collect success/reward/length stats."""
     results = []
+    known_files = set(glob.glob(os.path.join(video_dir, "*.mp4"))) if video_dir else set()
 
     for ep in range(n_episodes):
         seed = ep * 7 + 42  # deterministic but spread out
@@ -123,6 +141,9 @@ def evaluate(vec_env, policy: PolicyClient, n_episodes: int, max_steps: int):
             "length": length,
             "cumulative_reward": cumulative_reward,
         })
+
+        # Rename video to include episode number and outcome
+        rename_latest_video(video_dir, ep, success, known_files)
 
         status = "SUCCESS" if success else "FAIL"
         print(
@@ -185,7 +206,8 @@ def main():
     )
     policy = PolicyClient(host=args.host, port=args.port, strict=False)
 
-    results = evaluate(vec_env, policy, args.n_episodes, args.max_steps)
+    results = evaluate(vec_env, policy, args.n_episodes, args.max_steps,
+                       video_dir=video_dir)
     vec_env.close()
 
     summary = summarize(results, task_name)
