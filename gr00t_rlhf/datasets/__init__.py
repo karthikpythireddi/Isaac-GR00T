@@ -83,15 +83,18 @@ def _build_vla_step(obs_step: dict, act_step: dict, state_keys: list,
                     action_keys: list, video_keys: list) -> VLAStepData:
     """Convert a sampled window into VLAStepData for the GR00T processor."""
     # Build images dict: view_name -> list[np.ndarray (H, W, 3)]
+    # Use the full obs key (minus "video." prefix) as dict key so it matches
+    # the processor's modality_configs (e.g. "ego_view_bg_crop_pad_res256_freq20")
     images = {}
     for k in video_keys:
         for ok, ov in obs_step.items():
             if ok == k or ok == f"video.{k}" or ok.startswith(f"video.{k}"):
-                # ov shape: (1, H, W, 3) -> list of (H, W, 3)
+                # Derive the actual view name from the obs key
+                view_name = ok.removeprefix("video.") if ok.startswith("video.") else ok
                 if ov.ndim == 4:
-                    images[k] = [ov[i] for i in range(ov.shape[0])]
+                    images[view_name] = [ov[i] for i in range(ov.shape[0])]
                 else:
-                    images[k] = [ov]
+                    images[view_name] = [ov]
                 break
 
     # Build states dict: state_name -> np.ndarray (T, D)
