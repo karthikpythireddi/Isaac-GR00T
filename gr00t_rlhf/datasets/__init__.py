@@ -99,18 +99,18 @@ def _build_vla_step(obs_step: dict, act_step: dict, state_keys: list,
     for k in state_keys:
         key_with_prefix = f"state.{k}"
         if key_with_prefix in obs_step:
-            states[k] = obs_step[key_with_prefix].astype(np.float64)
+            states[k] = np.atleast_1d(obs_step[key_with_prefix].astype(np.float64))
         elif k in obs_step:
-            states[k] = obs_step[k].astype(np.float64)
+            states[k] = np.atleast_1d(obs_step[k].astype(np.float64))
 
     # Build actions dict: action_name -> np.ndarray (horizon, D)
     actions = {}
     for k in action_keys:
         key_with_prefix = f"action.{k}"
         if key_with_prefix in act_step:
-            actions[k] = act_step[key_with_prefix].astype(np.float64)
+            actions[k] = np.atleast_2d(act_step[key_with_prefix].astype(np.float64))
         elif k in act_step:
-            actions[k] = act_step[k].astype(np.float64)
+            actions[k] = np.atleast_2d(act_step[k].astype(np.float64))
 
     return VLAStepData(
         images=images,
