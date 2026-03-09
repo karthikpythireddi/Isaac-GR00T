@@ -154,9 +154,30 @@ def make_preference_collator(
     # Get the data collator from the processor
     data_collator = processor.collator
 
+    # Build mapping from bare video key (e.g. "ego_view") to the processor's
+    # full modality key (e.g. "ego_view_bg_crop_pad_res256_freq20")
+    proc_video_keys = processor.modality_configs[embodiment_tag]["video"].modality_keys
+    video_key_map = {}
+    for bare in video_keys:
+        for full in proc_video_keys:
+            if full == bare or full.startswith(bare):
+                video_key_map[bare] = full
+                break
+
     def _process_sample(obs_step, act_step):
         """Process a single sample through the GR00T processor."""
         vla_step = _build_vla_step(obs_step, act_step, state_keys, action_keys, video_keys)
+        # Remap image keys to match processor's expected modality keys
+        remapped_images = {}
+        for k, v in vla_step.images.items():
+            remapped_images[video_key_map.get(k, k)] = v
+        vla_step = VLAStepData(
+            images=remapped_images,
+            states=vla_step.states,
+            actions=vla_step.actions,
+            text=vla_step.text,
+            embodiment=vla_step.embodiment,
+        )
         messages = [{"type": "episode_step", "content": vla_step}]
         processed = processor(messages)
         return processed
