@@ -1,0 +1,153 @@
+{
+  "summary": {
+    "task_name": "PosttrainPnPNovelFromPlateToBowlSplitA_GR1ArmsAndWaistFourierHands_Env",
+    "n_episodes": 20,
+    "n_success": 8,
+    "success_rate": 0.4,
+    "avg_reward": 0.4,
+    "avg_length": 54.65,
+    "avg_success_length": 24.125
+  },
+  "episodes": [
+    {
+      "episode": 0,
+      "seed": 42,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 1,
+      "seed": 49,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 2,
+      "seed": 56,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 3,
+      "seed": 63,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 4,
+      "seed": 70,
+      "success": true,
+      "length": 23,
+      "cumulative_reward": 1.0
+    },
+    {
+      "episode": 5,
+      "seed": 77,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 6,
+      "seed": 84,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 7,
+      "seed": 91,
+      "success": true,
+      "length": 22,
+      "cumulative_reward": 1.0
+    },
+    {
+      "episode": 8,
+      "seed": 98,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 9,
+      "seed": 105,
+      "success": true,
+      "length": 24,
+      "cumulative_reward": 1.0
+    },
+    {
+      "episode": 10,
+      "seed": 112,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 11,
+      "seed": 119,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 12,
+      "seed": 126,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 13,
+      "seed": 133,
+      "success": true,
+      "length": 26,
+      "cumulative_reward": 1.0
+    },
+    {
+      "episode": 14,
+      "seed": 140,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 15,
+      "seed": 147,
+      "success": true,
+      "length": 24,
+      "cumulative_reward": 1.0
+    },
+    {
+      "episode": 16,
+      "seed": 154,
+      "success": false,
+      "length": 75,
+      "cumulative_reward": 0.0
+    },
+    {
+      "episode": 17,
+      "seed": 161,
+      "success": true,
+      "length": 24,
+      "cumulative_reward": 1.0
+    },
+    {
+      "episode": 18,
+      "seed": 168,
+      "success": true,
+      "length": 25,
+      "cumulative_reward": 1.0
+    },
+    {
+      "episode": 19,
+      "seed": 175,
+      "success": true,
+      "length": 25,
+      "cumulative_reward": 1.0
+    }
+  ]
+}
