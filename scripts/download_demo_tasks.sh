@@ -31,24 +31,40 @@ download_task() {
     mkdir -p "${BASE}/_dl_tmp"
 
     $PYTHON -c "
-import os, shutil
+import os, shutil, time
 from huggingface_hub import snapshot_download
 
-snapshot_download(
-    repo_id='${REPO}',
-    repo_type='dataset',
-    allow_patterns=['LeRobot/${TASK}/*', 'LeRobot/${TASK}/**/*'],
-    local_dir='${BASE}/_dl_tmp',
-)
+REPO = '${REPO}'
+TASK = '${TASK}'
+LOCAL_DIR = '${LOCAL_DIR}'
+TMP_DIR = '${BASE}/_dl_tmp'
 
-src = os.path.join('${BASE}/_dl_tmp', 'LeRobot', '${TASK}')
+# Retry up to 5 times with backoff on 429 rate limit
+for attempt in range(1, 6):
+    try:
+        snapshot_download(
+            repo_id=REPO,
+            repo_type='dataset',
+            allow_patterns=[f'LeRobot/{TASK}/*', f'LeRobot/{TASK}/**/*'],
+            local_dir=TMP_DIR,
+        )
+        break
+    except Exception as e:
+        if '429' in str(e) and attempt < 5:
+            wait = 60 * attempt
+            print(f'[rate limit] attempt {attempt}/5, waiting {wait}s...')
+            time.sleep(wait)
+        else:
+            raise
+
+src = os.path.join(TMP_DIR, 'LeRobot', TASK)
 if os.path.isdir(src):
-    shutil.move(src, '${LOCAL_DIR}')
-    shutil.rmtree('${BASE}/_dl_tmp', ignore_errors=True)
-    print('[done] ${TASK}')
+    shutil.move(src, LOCAL_DIR)
+    shutil.rmtree(TMP_DIR, ignore_errors=True)
+    print(f'[done] {TASK}')
 else:
     import subprocess
-    subprocess.run(['find', '${BASE}/_dl_tmp', '-maxdepth', '4', '-type', 'd'])
+    subprocess.run(['find', TMP_DIR, '-maxdepth', '4', '-type', 'd'])
     raise SystemExit('[error] Task dir not found after download')
 "
 }
