@@ -30,58 +30,64 @@ download_task() {
     echo "[download] ${TASK} ..."
     mkdir -p "${BASE}/_dl_tmp"
 
-    $PYTHON -c "
-import os, time
-from huggingface_hub import hf_hub_download, list_repo_tree
+    $PYTHON - <<PYEOF
+import os, time, shutil
+from huggingface_hub import hf_hub_download
 
 REPO = '${REPO}'
 TASK = '${TASK}'
 LOCAL_DIR = '${LOCAL_DIR}'
-DELAY = 0.35   # seconds between requests — keeps us under 1000 req/5min limit
+N = 1000
+DELAY = 0.35  # ~170 files/min, safely under 1000 req/5min
 
-# List all files under LeRobot/TASK
-print(f'Listing files for {TASK}...')
-items = list(list_repo_tree(REPO, repo_type='dataset',
-                             path_in_repo=f'LeRobot/{TASK}', recursive=True))
-files = [getattr(i, 'path', None) for i in items if getattr(i, 'size', None) is not None]
-print(f'Found {len(files)} files. Downloading sequentially (~{len(files)*DELAY/60:.0f} min)...')
+# Build file list from known structure — no list_repo_tree API calls needed
+META_FILES = [
+    'meta/info.json', 'meta/tasks.jsonl', 'meta/episodes.jsonl',
+    'meta/stats.json', 'meta/modality.json', 'meta/relative_stats.json',
+]
+DATA_FILES = [f'data/chunk-000/episode_{i:06d}.parquet' for i in range(N)]
+VIDEO_FILES = [f'videos/chunk-000/observation.images.ego_view/episode_{i:06d}.mp4' for i in range(N)]
+ALL_FILES = META_FILES + DATA_FILES + VIDEO_FILES
 
-for i, fpath in enumerate(files):
-    dest = os.path.join(LOCAL_DIR, os.path.relpath(fpath, f'LeRobot/{TASK}'))
+print(f'Downloading {len(ALL_FILES)} files for {TASK}...')
+skipped = 0
+for idx, rel_path in enumerate(ALL_FILES):
+    dest = os.path.join(LOCAL_DIR, rel_path)
     if os.path.exists(dest):
-        continue  # already downloaded — resume safely
+        skipped += 1
+        continue
+    hf_path = f'LeRobot/{TASK}/{rel_path}'
     for attempt in range(5):
         try:
-            hf_hub_download(
+            result = hf_hub_download(
                 repo_id=REPO, repo_type='dataset',
-                filename=fpath, local_dir=LOCAL_DIR,
+                filename=hf_path, local_dir=LOCAL_DIR,
             )
-            # Move from nested LeRobot/TASK/... to LOCAL_DIR/...
-            src = os.path.join(LOCAL_DIR, 'LeRobot', TASK,
-                               os.path.relpath(fpath, f'LeRobot/{TASK}'))
-            if os.path.exists(src) and not os.path.exists(dest):
+            # hf_hub_download saves to LOCAL_DIR/LeRobot/TASK/rel_path
+            # move to LOCAL_DIR/rel_path
+            src = os.path.join(LOCAL_DIR, 'LeRobot', TASK, rel_path)
+            if os.path.exists(src):
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
-                os.rename(src, dest)
+                shutil.move(src, dest)
             break
         except Exception as e:
             if '429' in str(e) and attempt < 4:
-                wait = 300  # wait 5 min on rate limit
-                print(f'  [rate limit] waiting {wait}s before retry...')
-                time.sleep(wait)
+                print(f'  [rate limit] waiting 300s...')
+                time.sleep(300)
             else:
-                print(f'  [warn] failed {fpath}: {e}')
+                print(f'  [warn] {hf_path}: {e}')
                 break
     time.sleep(DELAY)
-    if (i + 1) % 100 == 0:
-        print(f'  {i+1}/{len(files)} files downloaded')
+    done = idx + 1 - skipped
+    if done % 200 == 0:
+        print(f'  {idx+1}/{len(ALL_FILES)} ({skipped} skipped)')
 
-# Clean up empty LeRobot/ dir if present
-import shutil
+# Clean up empty nested dirs
 lerobot_dir = os.path.join(LOCAL_DIR, 'LeRobot')
 if os.path.isdir(lerobot_dir):
     shutil.rmtree(lerobot_dir, ignore_errors=True)
-print(f'[done] {TASK}')
-"
+print(f'[done] {TASK} ({skipped} already existed)')
+PYEOF
 }
 
 echo "========================================"
