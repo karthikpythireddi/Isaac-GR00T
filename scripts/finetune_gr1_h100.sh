@@ -57,7 +57,7 @@ torchrun --nproc_per_node=$NUM_GPUS --master_port=29500 \
     gr00t/experiment/launch_finetune.py \
     --base_model_path nvidia/GR00T-N1.6-3B \
     --dataset_path $DATASET_PATHS \
-    --embodiment_tag gr1 \
+    --embodiment_tag GR1 \
     --num_gpus $NUM_GPUS \
     --output_dir $OUTPUT_DIR \
     --save_steps 5000 \
