@@ -26,34 +26,24 @@ download_task() {
     fi
 
     echo "[download] ${TASK} (all 1000 episodes) ..."
-    $PYTHON -c "
-from huggingface_hub import snapshot_download
-import shutil, os
+    mkdir -p "${BASE}/_dl_tmp"
 
-REPO = '${REPO}'
-TASK = '${TASK}'
-LOCAL_DIR = '${LOCAL_DIR}'
+    # Use huggingface-cli which handles large dataset downloads reliably
+    huggingface-cli download "$REPO" \
+        --repo-type dataset \
+        --include "LeRobot/${TASK}/**" \
+        --local-dir "${BASE}/_dl_tmp"
 
-# Download entire task directory at once — much faster than file-by-file
-# and avoids HF rate limits
-tmp = snapshot_download(
-    repo_id=REPO,
-    repo_type='dataset',
-    allow_patterns=[f'LeRobot/{TASK}/**'],
-    local_dir='${BASE}/_snapshot_tmp',
-)
-
-# Move from nested LeRobot/<TASK> to expected flat location
-src = os.path.join('${BASE}/_snapshot_tmp', 'LeRobot', TASK)
-if os.path.isdir(src):
-    shutil.move(src, LOCAL_DIR)
-    shutil.rmtree('${BASE}/_snapshot_tmp', ignore_errors=True)
-    print(f'[done] {TASK} -> {LOCAL_DIR}')
-else:
-    print(f'[error] Expected path not found: {src}')
-    raise SystemExit(1)
-"
-    echo "[done] ${TASK}"
+    # Move from nested LeRobot/<TASK> into expected flat location
+    if [ -d "${BASE}/_dl_tmp/LeRobot/${TASK}" ]; then
+        mv "${BASE}/_dl_tmp/LeRobot/${TASK}" "${LOCAL_DIR}"
+        rm -rf "${BASE}/_dl_tmp"
+        echo "[done] ${TASK} -> ${LOCAL_DIR}"
+    else
+        echo "[error] Expected path not found: ${BASE}/_dl_tmp/LeRobot/${TASK}"
+        ls "${BASE}/_dl_tmp/" 2>/dev/null || true
+        exit 1
+    fi
 }
 
 echo "========================================"
