@@ -17,12 +17,18 @@ BASE=examples/robocasa-gr1-tabletop-tasks/gr1_finetune_data
 REPO=nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim
 
 probe_repo_structure() {
-    echo "[probe] Checking repo structure for first task..."
+    echo "[probe] Checking repo structure..."
     $PYTHON -c "
 from huggingface_hub import list_repo_tree
+# Top level
 items = list(list_repo_tree('${REPO}', repo_type='dataset', recursive=False))
-print('Top-level entries:')
-for item in items[:20]:
+print('Top-level:')
+for item in items:
+    print(' ', getattr(item, 'path', item))
+# Inside LeRobot/
+print('LeRobot/ contents:')
+items2 = list(list_repo_tree('${REPO}', repo_type='dataset', path_in_repo='LeRobot', recursive=False))
+for item in items2[:30]:
     print(' ', getattr(item, 'path', item))
 "
 }
