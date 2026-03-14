@@ -16,6 +16,17 @@ PYTHON=${PYTHON:-python}
 BASE=examples/robocasa-gr1-tabletop-tasks/gr1_finetune_data
 REPO=nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim
 
+probe_repo_structure() {
+    echo "[probe] Checking repo structure for first task..."
+    $PYTHON -c "
+from huggingface_hub import list_repo_tree
+items = list(list_repo_tree('${REPO}', repo_type='dataset', recursive=False))
+print('Top-level entries:')
+for item in items[:20]:
+    print(' ', getattr(item, 'path', item))
+"
+}
+
 download_task() {
     local TASK=$1
     local LOCAL_DIR="${BASE}/${TASK}"
@@ -28,22 +39,59 @@ download_task() {
     echo "[download] ${TASK} (all 1000 episodes) ..."
     mkdir -p "${BASE}/_dl_tmp"
 
-    # Use huggingface-cli which handles large dataset downloads reliably
-    huggingface-cli download "$REPO" \
-        --repo-type dataset \
-        --include "LeRobot/${TASK}/**" \
-        --local-dir "${BASE}/_dl_tmp"
+    $PYTHON -c "
+import os, shutil
+from huggingface_hub import snapshot_download, list_repo_tree
 
-    # Move from nested LeRobot/<TASK> into expected flat location
-    if [ -d "${BASE}/_dl_tmp/LeRobot/${TASK}" ]; then
-        mv "${BASE}/_dl_tmp/LeRobot/${TASK}" "${LOCAL_DIR}"
-        rm -rf "${BASE}/_dl_tmp"
-        echo "[done] ${TASK} -> ${LOCAL_DIR}"
-    else
-        echo "[error] Expected path not found: ${BASE}/_dl_tmp/LeRobot/${TASK}"
-        ls "${BASE}/_dl_tmp/" 2>/dev/null || true
-        exit 1
-    fi
+REPO = '${REPO}'
+TASK = '${TASK}'
+LOCAL_DIR = '${LOCAL_DIR}'
+TMP_DIR = '${BASE}/_dl_tmp'
+
+# Find the correct prefix by listing repo top-level
+top = list(list_repo_tree(REPO, repo_type='dataset', recursive=False))
+top_paths = [getattr(i, 'path', str(i)) for i in top]
+print('Top-level:', top_paths[:10])
+
+# Try different prefix patterns
+candidates = [
+    f'LeRobot/{TASK}',
+    f'{TASK}',
+    f'data/{TASK}',
+]
+prefix = None
+for c in candidates:
+    # Check if any top-level entry starts with this
+    if any(p == c or p.startswith(c + '/') or p.startswith(c.split('/')[0]) for p in top_paths):
+        prefix = c.split('/')[0]  # use top-level dir
+        break
+
+if prefix is None:
+    prefix = top_paths[0] if top_paths else 'LeRobot'
+    print(f'[warn] Could not detect prefix, using: {prefix}')
+else:
+    print(f'[info] Detected prefix: {prefix}')
+
+# Download using detected prefix
+snapshot_download(
+    repo_id=REPO,
+    repo_type='dataset',
+    allow_patterns=[f'{prefix}/{TASK}/**', f'{prefix}/{TASK}/*'],
+    local_dir=TMP_DIR,
+)
+
+# Find the downloaded task dir
+for root, dirs, files in os.walk(TMP_DIR):
+    if os.path.basename(root) == TASK:
+        shutil.move(root, LOCAL_DIR)
+        shutil.rmtree(TMP_DIR, ignore_errors=True)
+        print(f'[done] {TASK} -> {LOCAL_DIR}')
+        raise SystemExit(0)
+
+print(f'[error] Task dir not found after download. Contents:')
+os.system(f'find {TMP_DIR} -maxdepth 3 -type d')
+raise SystemExit(1)
+"
 }
 
 echo "========================================"
@@ -52,6 +100,7 @@ echo "for all 4 GR1 tabletop evaluation tasks"
 echo "Estimated: ~32GB total, ~30-60 min"
 echo "========================================"
 
+probe_repo_structure
 download_task "gr1_arms_waist.CuttingboardToBasket"
 download_task "gr1_unified.PnPBottleToCabinetClose"
 download_task "gr1_unified.PosttrainPnPNovelFromPlateToBowlSplitA"
