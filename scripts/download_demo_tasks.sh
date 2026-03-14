@@ -1,109 +1,73 @@
 #!/bin/bash
-# Download demo data for 3 remaining tasks (first 50 episodes only to avoid rate limits)
-# Run after: huggingface-cli login
+# Download full 1000-episode demo data for all 4 GR1 tabletop tasks
+# from nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim
 #
-# Usage: conda activate groot && bash scripts/download_demo_tasks.sh
+# Uses snapshot_download for efficiency — downloads entire task directory
+# in one call instead of file-by-file, which avoids rate limit issues.
+#
+# Storage estimate: ~8GB per task × 4 tasks = ~32GB total
+# Runtime: ~30-60 min depending on network
+#
+# Run after: huggingface-cli login
+# Usage: bash scripts/download_demo_tasks.sh
 
 set -e
-PYTHON=${PYTHON:-/home/karthik/miniconda3/envs/groot/bin/python}
+PYTHON=${PYTHON:-python}
 BASE=examples/robocasa-gr1-tabletop-tasks/gr1_finetune_data
 REPO=nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim
-N_EPISODES=50  # Only download first 50 episodes (not all 1000)
 
 download_task() {
     local TASK=$1
     local LOCAL_DIR="${BASE}/${TASK}"
 
     if [ -d "${LOCAL_DIR}/meta" ] && [ -d "${LOCAL_DIR}/data/chunk-000" ]; then
-        echo "[skip] ${TASK} already exists"
+        echo "[skip] ${TASK} already exists at ${LOCAL_DIR}"
         return
     fi
 
-    echo "[download] ${TASK} (first ${N_EPISODES} episodes) ..."
-    local TEMP_DIR="${BASE}/_dl_${TASK}"
+    echo "[download] ${TASK} (all 1000 episodes) ..."
     $PYTHON -c "
-import time
-from huggingface_hub import hf_hub_download, list_repo_tree
-import os
+from huggingface_hub import snapshot_download
+import shutil, os
 
 REPO = '${REPO}'
 TASK = '${TASK}'
-TEMP_DIR = '${TEMP_DIR}'
-N = ${N_EPISODES}
+LOCAL_DIR = '${LOCAL_DIR}'
 
-# Build list of specific files to download (meta + first N episodes)
-files_to_download = []
+# Download entire task directory at once — much faster than file-by-file
+# and avoids HF rate limits
+tmp = snapshot_download(
+    repo_id=REPO,
+    repo_type='dataset',
+    allow_patterns=[f'LeRobot/{TASK}/**'],
+    local_dir='${BASE}/_snapshot_tmp',
+)
 
-# Meta files (small, always needed)
-meta_items = list(list_repo_tree(REPO, repo_type='dataset', path_in_repo=f'LeRobot/{TASK}/meta'))
-for item in meta_items:
-    if hasattr(item, 'size'):  # is a file, not a dir
-        files_to_download.append(item.path)
-
-# First N parquet files
-for i in range(N):
-    files_to_download.append(f'LeRobot/{TASK}/data/chunk-000/episode_{i:06d}.parquet')
-
-# First N video files
-for i in range(N):
-    files_to_download.append(f'LeRobot/{TASK}/videos/chunk-000/observation.images.ego_view/episode_{i:06d}.mp4')
-
-print(f'Downloading {len(files_to_download)} files...')
-
-# Download files one batch at a time with small delays
-for i, fpath in enumerate(files_to_download):
-    try:
-        hf_hub_download(
-            repo_id=REPO,
-            repo_type='dataset',
-            filename=fpath,
-            local_dir=TEMP_DIR,
-        )
-    except Exception as e:
-        if '429' in str(e):
-            print(f'  Rate limited at file {i}/{len(files_to_download)}, waiting 60s...')
-            time.sleep(60)
-            hf_hub_download(
-                repo_id=REPO,
-                repo_type='dataset',
-                filename=fpath,
-                local_dir=TEMP_DIR,
-            )
-        else:
-            print(f'  [warn] Failed: {fpath}: {e}')
-
-    if (i + 1) % 50 == 0:
-        print(f'  Downloaded {i+1}/{len(files_to_download)} files')
-        time.sleep(5)  # Brief pause every 50 files
-
-print('Download complete')
+# Move from nested LeRobot/<TASK> to expected flat location
+src = os.path.join('${BASE}/_snapshot_tmp', 'LeRobot', TASK)
+if os.path.isdir(src):
+    shutil.move(src, LOCAL_DIR)
+    shutil.rmtree('${BASE}/_snapshot_tmp', ignore_errors=True)
+    print(f'[done] {TASK} -> {LOCAL_DIR}')
+else:
+    print(f'[error] Expected path not found: {src}')
+    raise SystemExit(1)
 "
-    # Move from nested LeRobot/ path to expected location
-    if [ -d "${TEMP_DIR}/LeRobot/${TASK}" ]; then
-        mv "${TEMP_DIR}/LeRobot/${TASK}" "${LOCAL_DIR}"
-        rm -rf "${TEMP_DIR}"
-        echo "[done] ${TASK} -> ${LOCAL_DIR}"
-    elif [ -d "${TEMP_DIR}/meta" ]; then
-        mv "${TEMP_DIR}" "${LOCAL_DIR}"
-        echo "[done] ${TASK} -> ${LOCAL_DIR}"
-    else
-        echo "[error] Unexpected download structure in ${TEMP_DIR}"
-        ls -R "${TEMP_DIR}" | head -20
-    fi
-    echo "  Waiting 60s before next task to avoid rate limits..."
-    sleep 60
+    echo "[done] ${TASK}"
 }
 
 echo "========================================"
-echo "Downloading demo data for 3 tasks"
-echo "(first ${N_EPISODES} episodes each)"
+echo "Downloading full demo data (1000 eps each)"
+echo "for all 4 GR1 tabletop evaluation tasks"
+echo "Estimated: ~32GB total, ~30-60 min"
 echo "========================================"
 
+download_task "gr1_arms_waist.CuttingboardToBasket"
 download_task "gr1_unified.PnPBottleToCabinetClose"
 download_task "gr1_unified.PosttrainPnPNovelFromPlateToBowlSplitA"
 download_task "gr1_unified.PosttrainPnPNovelFromTrayToPotSplitA"
 
 echo ""
-echo "[done] All downloads complete!"
+echo "[done] All 4 tasks downloaded!"
 echo "Demo data at: ${BASE}/"
-ls -d ${BASE}/gr1_unified.* 2>/dev/null
+ls -d ${BASE}/gr1_* 2>/dev/null

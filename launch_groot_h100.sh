@@ -31,6 +31,18 @@ STEP=${1:-"all"}
 
 # ---- Config ------------------------------------------------------------------
 BASE_MODEL="nvidia/GR00T-N1.6-3B"
+SFT_CHECKPOINT="outputs/gr1_tabletop_sft_h100/checkpoint-30000"
+
+# Use SFT checkpoint for DPO/RWR if it exists, otherwise fall back to base
+_policy_base() {
+    if [ -d "$SFT_CHECKPOINT" ]; then
+        echo "$SFT_CHECKPOINT"
+    else
+        echo "[warn] SFT checkpoint not found at $SFT_CHECKPOINT, using zero-shot base model." >&2
+        echo "$BASE_MODEL"
+    fi
+}
+POLICY_BASE=$(_policy_base)
 
 PREFERENCE_DIR="preference_data/gr1_demo_pairs"
 PREFERENCE_HDF5="$PREFERENCE_DIR/all_4tasks_demo_preferences.hdf5"
@@ -129,11 +141,20 @@ step_rollouts() {
     echo "[rollouts] Done. Preference data: $PREFERENCE_HDF5"
 }
 
-# ---- DPO (Base -> DPO) ------------------------------------------------------
+# ---- SFT fine-tuning (optional but recommended) ------------------------------
+step_sft() {
+    echo "[sft] Running SFT fine-tuning on H100..."
+    bash scripts/finetune_gr1_h100.sh 2>&1 | tee outputs/finetune_gr1_h100.log
+    # Refresh POLICY_BASE after SFT
+    POLICY_BASE=$(_policy_base)
+    echo "[sft] Done. POLICY_BASE=$POLICY_BASE"
+}
+
+# ---- DPO (SFT -> DPO) -------------------------------------------------------
 step_dpo() {
-    echo "[dpo] DPO fine-tuning from base model..."
+    echo "[dpo] DPO fine-tuning from: $POLICY_BASE"
     python gr00t_rlhf/algos/dpo.py \
-        --model_path "$BASE_MODEL" \
+        --model_path "$POLICY_BASE" \
         --hdf5_path  "$PREFERENCE_HDF5" \
         --output_dir "$DPO_OUTPUT" \
         --beta 0.1 \
@@ -146,11 +167,11 @@ step_dpo() {
     echo "[dpo] Done. Checkpoint: $DPO_OUTPUT"
 }
 
-# ---- RWR (Base -> RWR) ------------------------------------------------------
+# ---- RWR (SFT -> RWR) -------------------------------------------------------
 step_rwr() {
-    echo "[rwr] RWR fine-tuning from base model..."
+    echo "[rwr] RWR fine-tuning from: $POLICY_BASE"
     python gr00t_rlhf/algos/rwr.py \
-        --model_path "$BASE_MODEL" \
+        --model_path "$POLICY_BASE" \
         --hdf5_path  "$PREFERENCE_HDF5" \
         --output_dir "$RWR_OUTPUT" \
         --temperature 1.0 \
@@ -322,7 +343,8 @@ step_eval() {
 
 # ---- Dispatcher --------------------------------------------------------------
 case $STEP in
-    all)       step_install; step_download; step_rollouts; step_dpo; step_rwr; step_ppo; step_eval ;;
+    all)       step_install; step_download; step_sft; step_rollouts; step_dpo; step_rwr; step_eval ;;
+    sft)       step_sft     ;;
     install)   step_install  ;;
     download)  step_download ;;
     rollouts)  step_rollouts ;;
