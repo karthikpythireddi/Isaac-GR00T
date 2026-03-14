@@ -85,6 +85,17 @@ echo "============================================================"
 step_install() {
     echo "[install] Installing dependencies..."
     pip install -e ".[train]" --ignore-requires-python --quiet
+
+    # FlashAttention2 — required by GR00T backbone (H100 = sm_90)
+    # Pre-built wheel is much faster than compiling from source
+    pip install flash-attn --no-build-isolation --quiet || \
+        pip install flash-attn --quiet || \
+        echo "[warn] flash_attn install failed — trying with CUDA wheel..."
+        pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4/flash_attn-2.7.4+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl --quiet 2>/dev/null || true
+
+    # robosuite — required for rollout collection environments
+    pip install robosuite --quiet
+
     pip install -e external_dependencies/robocasa-gr1-tabletop-tasks --quiet
     pip install gymnasium h5py wandb pyarrow opencv-python pytz --quiet
     echo "[install] Done."
