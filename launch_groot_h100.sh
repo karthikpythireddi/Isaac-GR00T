@@ -100,7 +100,11 @@ step_install() {
     # robosuite — required for rollout collection environments
     pip install robosuite --quiet
 
-    pip install -e external_dependencies/robocasa-gr1-tabletop-tasks --quiet
+    # Install robocasa without deps to prevent it downgrading mujoco to ==3.2.6
+    # (robosuite needs >=3.3.0; we pin to 3.3.0 which satisfies both in practice)
+    pip install -e external_dependencies/robocasa-gr1-tabletop-tasks --no-deps --quiet
+    pip install "mujoco==3.3.0" --quiet
+
     pip install gymnasium h5py wandb pyarrow opencv-python pytz --quiet
     echo "[install] Done."
 }
