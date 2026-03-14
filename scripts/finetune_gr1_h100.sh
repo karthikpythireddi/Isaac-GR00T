@@ -23,7 +23,7 @@ export PYOPENGL_PLATFORM=egl
 
 # All 4 task demo directories (already downloaded)
 TASK_DIRS=(
-    "examples/robocasa-gr1-tabletop-tasks/gr1_finetune_data/gr1_arms_waist.CuttingboardToBasket"
+    "examples/robocasa-gr1-tabletop-tasks/gr1_finetune_data/gr1_unified.PosttrainPnPNovelFromCuttingboardToBasketSplitA"
     "examples/robocasa-gr1-tabletop-tasks/gr1_finetune_data/gr1_unified.PnPBottleToCabinetClose"
     "examples/robocasa-gr1-tabletop-tasks/gr1_finetune_data/gr1_unified.PosttrainPnPNovelFromPlateToBowlSplitA"
     "examples/robocasa-gr1-tabletop-tasks/gr1_finetune_data/gr1_unified.PosttrainPnPNovelFromTrayToPotSplitA"
