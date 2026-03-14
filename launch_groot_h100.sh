@@ -86,12 +86,16 @@ step_install() {
     echo "[install] Installing dependencies..."
     pip install -e ".[train]" --ignore-requires-python --quiet
 
-    # FlashAttention2 — required by GR00T backbone (H100 = sm_90)
-    # Pre-built wheel is much faster than compiling from source
-    pip install flash-attn --no-build-isolation --quiet || \
-        pip install flash-attn --quiet || \
-        echo "[warn] flash_attn install failed — trying with CUDA wheel..."
-        pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4/flash_attn-2.7.4+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl --quiet 2>/dev/null || true
+    # FlashAttention2 — required by GR00T backbone
+    # Download wheel directly to /tmp to avoid cross-device link errors
+    # Wheel targets: torch 2.7, cu12, cp312, cxx11abiTRUE
+    FLASH_WHL="flash_attn-2.8.3+cu12torch2.7cxx11abiTRUE-cp312-cp312-linux_x86_64.whl"
+    FLASH_URL="https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/${FLASH_WHL}"
+    echo "[install] Downloading flash-attn wheel..."
+    wget -q "$FLASH_URL" -O "/tmp/${FLASH_WHL}" && \
+        pip install "/tmp/${FLASH_WHL}" --quiet && \
+        rm "/tmp/${FLASH_WHL}" || \
+        echo "[warn] flash_attn install failed — model will fall back to eager attention"
 
     # robosuite — required for rollout collection environments
     pip install robosuite --quiet
