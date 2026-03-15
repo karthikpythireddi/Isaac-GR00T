@@ -79,13 +79,13 @@ class Gr00tPolicy(BasePolicy):
         model_dir = Path(model_path)
 
         # Load the pretrained model and move to target device with bfloat16 precision
-        model = AutoModel.from_pretrained(model_dir)
+        model = AutoModel.from_pretrained(model_dir, trust_remote_code=True)
         model.eval()  # Set model to evaluation mode
         model.to(device=device, dtype=torch.bfloat16)
         self.model = model
 
         # Load the processor for input/output transformation
-        self.processor: BaseProcessor = AutoProcessor.from_pretrained(model_dir)
+        self.processor: BaseProcessor = AutoProcessor.from_pretrained(model_dir, trust_remote_code=True)
         self.processor.eval()
 
         # Store embodiment-specific configurations

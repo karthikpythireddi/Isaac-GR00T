@@ -16,7 +16,9 @@ Usage:
 
 import argparse
 import copy
+import glob
 import os
+import shutil
 
 import torch
 import torch.nn.functional as F
@@ -32,6 +34,16 @@ EMBODIMENT_TAG = "gr1"
 VIDEO_KEYS  = ["ego_view"]
 STATE_KEYS  = ["left_arm", "right_arm", "left_hand", "right_hand", "waist"]
 ACTION_KEYS = STATE_KEYS
+
+
+def _copy_processor_files(src_dir: str, dst_dir: str):
+    """Copy tokenizer/processor config files so the server can load the checkpoint."""
+    patterns = ["preprocessor_config.json", "tokenizer*.json",
+                "tokenizer_config.json", "special_tokens_map.json",
+                "processor_config.json"]
+    for pattern in patterns:
+        for src in glob.glob(os.path.join(src_dir, pattern)):
+            shutil.copy2(src, dst_dir)
 
 
 def compute_flow_loss(model: Gr00tN1d6, batch: dict, device: str) -> torch.Tensor:
@@ -135,9 +147,11 @@ def train_dpo(
 
         ckpt = os.path.join(output_dir, f"checkpoint-epoch{epoch}")
         policy.save_pretrained(ckpt)
+        _copy_processor_files(model_path, ckpt)
         print(f"[DPO] Checkpoint: {ckpt}")
 
     policy.save_pretrained(output_dir)
+    _copy_processor_files(model_path, output_dir)
     print(f"[DPO] Done. Model at {output_dir}")
     if use_wandb:
         import wandb; wandb.finish()

@@ -20,13 +20,25 @@ Usage:
 """
 
 import argparse
+import glob
 import os
+import shutil
 
 import torch
 from torch.utils.data import DataLoader
 
 from gr00t.model.gr00t_n1d6.gr00t_n1d6 import Gr00tN1d6
 from gr00t_rlhf.datasets import GR00TPreferenceDataset, make_preference_collator
+
+
+def _copy_processor_files(src_dir: str, dst_dir: str):
+    """Copy tokenizer/processor config files so the server can load the checkpoint."""
+    patterns = ["preprocessor_config.json", "tokenizer*.json",
+                "tokenizer_config.json", "special_tokens_map.json",
+                "processor_config.json"]
+    for pattern in patterns:
+        for src in glob.glob(os.path.join(src_dir, pattern)):
+            shutil.copy2(src, dst_dir)
 
 
 # GR1 embodiment: matches the base pretrained GR00T-N1.6-3B model config
@@ -136,9 +148,11 @@ def train_rwr(
 
         ckpt = os.path.join(output_dir, f"checkpoint-epoch{epoch}")
         policy.save_pretrained(ckpt)
+        _copy_processor_files(model_path, ckpt)
         print(f"[RWR] Checkpoint: {ckpt}")
 
     policy.save_pretrained(output_dir)
+    _copy_processor_files(model_path, output_dir)
     print(f"[RWR] Done. Model at {output_dir}")
     if use_wandb:
         import wandb; wandb.finish()
