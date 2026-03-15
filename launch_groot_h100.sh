@@ -141,7 +141,7 @@ step_rollouts() {
         fi
 
         echo "[rollouts] Collecting 50 pairs for $TASK ..."
-        python scripts/build_demo_preference_pairs.py \
+        MUJOCO_GL=osmesa PYOPENGL_PLATFORM=osmesa python scripts/build_demo_preference_pairs.py \
             --env_name "$ENV" \
             --demo_data_dir "$DEMO_DIR" \
             --host localhost \
@@ -327,7 +327,7 @@ step_eval() {
             fi
 
             echo "[eval] $LABEL / $TASK"
-            python scripts/eval_policy.py \
+            MUJOCO_GL=osmesa PYOPENGL_PLATFORM=osmesa python scripts/eval_policy.py \
                 --env_name "$ENV" \
                 --host localhost \
                 --port $EVAL_PORT \
