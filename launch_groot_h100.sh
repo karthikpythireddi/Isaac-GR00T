@@ -65,14 +65,14 @@ EVAL_ENVS=(
 
 # Demo data directories (task_name -> demo_dir)
 declare -A DEMO_DIRS
-DEMO_DIRS["PosttrainPnPNovelFromCuttingboardToBasketSplitA"]="gr1_arms_waist.CuttingboardToBasket"
+DEMO_DIRS["PosttrainPnPNovelFromCuttingboardToBasketSplitA"]="gr1_unified.PosttrainPnPNovelFromCuttingboardToBasketSplitA"
 DEMO_DIRS["PnPBottleToCabinetClose"]="gr1_unified.PnPBottleToCabinetClose"
 DEMO_DIRS["PosttrainPnPNovelFromPlateToBowlSplitA"]="gr1_unified.PosttrainPnPNovelFromPlateToBowlSplitA"
 DEMO_DIRS["PosttrainPnPNovelFromTrayToPotSplitA"]="gr1_unified.PosttrainPnPNovelFromTrayToPotSplitA"
 # ------------------------------------------------------------------------------
 
-export MUJOCO_GL=egl
-export PYOPENGL_PLATFORM=egl
+export MUJOCO_GL=osmesa
+export PYOPENGL_PLATFORM=osmesa
 
 echo "============================================================"
 echo " GR00T RLHF Pipeline (H100)"
@@ -141,7 +141,7 @@ step_rollouts() {
         fi
 
         echo "[rollouts] Collecting 50 pairs for $TASK ..."
-        MUJOCO_GL=osmesa PYOPENGL_PLATFORM=osmesa python scripts/build_demo_preference_pairs.py \
+        python scripts/build_demo_preference_pairs.py \
             --env_name "$ENV" \
             --demo_data_dir "$DEMO_DIR" \
             --host localhost \
@@ -327,7 +327,7 @@ step_eval() {
             fi
 
             echo "[eval] $LABEL / $TASK"
-            MUJOCO_GL=osmesa PYOPENGL_PLATFORM=osmesa python scripts/eval_policy.py \
+            python scripts/eval_policy.py \
                 --env_name "$ENV" \
                 --host localhost \
                 --port $EVAL_PORT \
