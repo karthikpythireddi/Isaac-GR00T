@@ -227,11 +227,7 @@ def rollout(vec_env, policy: PolicyClient, seed: int) -> dict:
 
         policy_obs = dict(obs)
         # Remap padded video key back to base key expected by GR00T server
-        _video_keys = [k for k in policy_obs.keys() if "video" in k or "image" in k]
-        if not hasattr(rollout, "_printed_keys"):
-            print(f"[debug] obs keys: {sorted(policy_obs.keys())}", flush=True)
-            print(f"[debug] video/image keys: {_video_keys}", flush=True)
-            rollout._printed_keys = True
+        # (MultiStepWrapper pads key to e.g. video.ego_view_pad_res256_freq20)
         for k in list(policy_obs.keys()):
             if k != "video.ego_view" and ("ego_view" in k or k.startswith("video.")):
                 policy_obs["video.ego_view"] = policy_obs[k]
