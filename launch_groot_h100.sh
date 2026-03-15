@@ -53,7 +53,7 @@ RWR_OUTPUT="outputs/rwr"
 PPO_OUTPUT="outputs/ppo"
 EVAL_OUTPUT="outputs/eval"
 
-SERVER_PORT=5555
+SERVER_PORT=5556
 
 # 4 tasks with moderate base policy success (good mix of failures for losers)
 EVAL_ENVS=(
