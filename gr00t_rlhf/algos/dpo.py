@@ -41,8 +41,7 @@ def _copy_processor_files(src_dir: str, dst_dir: str):
     patterns = [
         "preprocessor_config.json", "tokenizer*.json", "tokenizer_config.json",
         "special_tokens_map.json", "processor_config.json", "added_tokens.json",
-        "merges.txt", "vocab.json", "chat_template.json", "config.json",
-        "generation_config.json", "*.py",
+        "merges.txt", "vocab.json", "chat_template.json", "*.py",
     ]
     for pattern in patterns:
         for src in glob.glob(os.path.join(src_dir, pattern)):
