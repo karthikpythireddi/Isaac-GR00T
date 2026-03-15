@@ -118,10 +118,10 @@ step_download() {
 
 # ---- Rollout collection (base policy, paired with demos) ---------------------
 step_rollouts() {
-    echo "[rollouts] Starting GR00T inference server ($BASE_MODEL)..."
+    echo "[rollouts] Starting GR00T inference server ($POLICY_BASE)..."
     python gr00t/eval/run_gr00t_server.py \
-        --model-path "$BASE_MODEL" \
-        --embodiment-tag GR1 \
+        --model-path "$POLICY_BASE" \
+        --embodiment-tag NEW_EMBODIMENT \
         --use-sim-policy-wrapper \
         --port $SERVER_PORT &
     SERVER_PID=$!
@@ -291,7 +291,7 @@ step_eval() {
         echo "[eval] Starting server for $LABEL (model: $MODEL_DIR)..."
         python gr00t/eval/run_gr00t_server.py \
             --model-path "$MODEL_DIR" \
-            --embodiment-tag GR1 \
+            --embodiment-tag NEW_EMBODIMENT \
             --use-sim-policy-wrapper \
             --port $EVAL_PORT &
         EVAL_SERVER_PID=$!
