@@ -73,6 +73,7 @@ DEMO_DIRS["PosttrainPnPNovelFromTrayToPotSplitA"]="gr1_unified.PosttrainPnPNovel
 
 export MUJOCO_GL=osmesa
 export PYOPENGL_PLATFORM=osmesa
+export NUMBA_DISABLE_JIT=1
 
 echo "============================================================"
 echo " GR00T RLHF Pipeline (H100)"

@@ -226,6 +226,16 @@ def rollout(vec_env, policy: PolicyClient, seed: int) -> dict:
             traj_obs[k].append(obs[k][0, 0])
 
         policy_obs = dict(obs)
+        # Remap padded video key back to base key expected by GR00T server
+        _video_keys = [k for k in policy_obs.keys() if "video" in k or "image" in k]
+        if not hasattr(rollout, "_printed_keys"):
+            print(f"[debug] obs keys: {sorted(policy_obs.keys())}", flush=True)
+            print(f"[debug] video/image keys: {_video_keys}", flush=True)
+            rollout._printed_keys = True
+        for k in list(policy_obs.keys()):
+            if k != "video.ego_view" and ("ego_view" in k or k.startswith("video.")):
+                policy_obs["video.ego_view"] = policy_obs[k]
+                break
         # Pad missing state keys for embodiments that expect them
         for mk, shape in [("state.left_leg", (1,1,6)),
                            ("state.right_leg", (1,1,6)),
