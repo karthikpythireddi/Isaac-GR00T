@@ -51,7 +51,7 @@ def make_env_fn(env_name: str, max_episode_steps: int, video_dir: str = None):
                 VideoRecorder,
                 VideoRecordingWrapper,
             )
-            video_recorder = VideoRecorder.create_h264(fps=30, crf=22)
+            video_recorder = VideoRecorder.create_h264(fps=30, crf=18)
             env = VideoRecordingWrapper(
                 env,
                 video_recorder,
