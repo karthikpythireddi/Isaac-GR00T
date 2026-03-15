@@ -71,8 +71,8 @@ DEMO_DIRS["PosttrainPnPNovelFromPlateToBowlSplitA"]="gr1_unified.PosttrainPnPNov
 DEMO_DIRS["PosttrainPnPNovelFromTrayToPotSplitA"]="gr1_unified.PosttrainPnPNovelFromTrayToPotSplitA"
 # ------------------------------------------------------------------------------
 
-export MUJOCO_GL=osmesa
-export PYOPENGL_PLATFORM=osmesa
+export MUJOCO_GL=egl
+export PYOPENGL_PLATFORM=egl
 
 echo "============================================================"
 echo " GR00T RLHF Pipeline (H100)"
