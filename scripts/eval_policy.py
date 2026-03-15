@@ -29,8 +29,8 @@ from pathlib import Path
 import gymnasium as gym
 import numpy as np
 
-os.environ.setdefault("MUJOCO_GL", "egl")
-os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
+os.environ.setdefault("MUJOCO_GL", "osmesa")
+os.environ.setdefault("PYOPENGL_PLATFORM", "osmesa")
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -118,6 +118,11 @@ def evaluate(vec_env, policy: PolicyClient, n_episodes: int, max_steps: int):
 
         while True:
             policy_obs = dict(obs)
+            # Remap padded video key to base key expected by GR00T server
+            for k in list(policy_obs.keys()):
+                if k != "video.ego_view" and ("ego_view" in k or k.startswith("video.")):
+                    policy_obs["video.ego_view"] = policy_obs[k]
+                    break
             # Pad missing state keys
             for mk, shape in [("state.left_leg", (1,1,6)),
                                ("state.right_leg", (1,1,6)),
