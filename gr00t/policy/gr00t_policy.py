@@ -84,8 +84,14 @@ class Gr00tPolicy(BasePolicy):
         model.to(device=device, dtype=torch.bfloat16)
         self.model = model
 
-        # Load the processor for input/output transformation
-        self.processor: BaseProcessor = AutoProcessor.from_pretrained(model_dir, trust_remote_code=True)
+        # Load the processor for input/output transformation.
+        # Fine-tuned checkpoints may only have Eagle backbone processor files,
+        # so fall back to the base GR00T model if the loaded processor is not
+        # a GR00T BaseProcessor (i.e. lacks an eval() method).
+        processor = AutoProcessor.from_pretrained(model_dir, trust_remote_code=True)
+        if not isinstance(processor, BaseProcessor):
+            processor = AutoProcessor.from_pretrained("nvidia/GR00T-N1.6-3B", trust_remote_code=True)
+        self.processor: BaseProcessor = processor
         self.processor.eval()
 
         # Store embodiment-specific configurations
