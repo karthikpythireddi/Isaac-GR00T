@@ -40,7 +40,7 @@ def _copy_processor_files(src_dir: str, dst_dir: str):
     """Copy tokenizer/processor config files so the server can load the checkpoint."""
     patterns = [
         "preprocessor_config.json", "tokenizer*.json", "tokenizer_config.json",
-        "special_tokens_map.json", "processor_config.json", "added_tokens.json",
+        "special_tokens_map.json", "added_tokens.json",
         "merges.txt", "vocab.json", "chat_template.json", "*.py",
     ]
     for pattern in patterns:
