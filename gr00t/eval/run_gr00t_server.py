@@ -33,6 +33,9 @@ class ServerConfig:
     modality_config_path: str | None = None
     """Path to the modality configuration file"""
 
+    processor_path: str | None = None
+    """Path to load the processor from (overrides model_path for processor loading)"""
+
     execution_horizon: int | None = None
     """Policy execution horizon during inference."""
 
@@ -69,6 +72,7 @@ def main(config: ServerConfig):
             model_path=config.model_path,
             device=config.device,
             strict=config.strict,
+            processor_path=config.processor_path,
         )
     elif config.dataset_path is not None:
         if config.modality_config_path is None:

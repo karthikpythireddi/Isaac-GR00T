@@ -63,6 +63,7 @@ class Gr00tPolicy(BasePolicy):
         *,
         device: int | str,
         strict: bool = True,
+        processor_path: str | None = None,
     ):
         """Initialize the Gr00t Policy.
 
@@ -85,10 +86,11 @@ class Gr00tPolicy(BasePolicy):
         self.model = model
 
         # Load the processor for input/output transformation.
-        # Fine-tuned checkpoints may only have Eagle backbone processor files,
-        # so fall back to the base GR00T model if the loaded processor is not
-        # a GR00T BaseProcessor (i.e. lacks an eval() method).
-        processor = AutoProcessor.from_pretrained(model_dir, trust_remote_code=True)
+        # Fine-tuned checkpoints may only have Eagle backbone processor files.
+        # Use processor_path if provided, otherwise try model_dir and fall back
+        # to nvidia/GR00T-N1.6-3B if we get the wrong processor type.
+        proc_dir = Path(processor_path) if processor_path else model_dir
+        processor = AutoProcessor.from_pretrained(proc_dir, trust_remote_code=True)
         if not isinstance(processor, BaseProcessor):
             processor = AutoProcessor.from_pretrained("nvidia/GR00T-N1.6-3B", trust_remote_code=True)
         self.processor: BaseProcessor = processor

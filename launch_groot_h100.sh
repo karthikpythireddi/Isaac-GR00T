@@ -290,11 +290,18 @@ step_eval() {
 
         # ---- Start server for this model ----
         echo "[eval] Starting server for $LABEL (model: $MODEL_DIR)..."
+        # For fine-tuned checkpoints (dpo/rwr/ppo), load processor from SFT
+        # checkpoint which has new_embodiment registered.
+        PROC_PATH_ARG=""
+        if [[ "$LABEL" != "base" ]] && [ -d "$SFT_CHECKPOINT" ]; then
+            PROC_PATH_ARG="--processor-path $SFT_CHECKPOINT"
+        fi
         python gr00t/eval/run_gr00t_server.py \
             --model-path "$MODEL_DIR" \
             --embodiment-tag NEW_EMBODIMENT \
             --use-sim-policy-wrapper \
-            --port $EVAL_PORT &
+            --port $EVAL_PORT \
+            $PROC_PATH_ARG &
         EVAL_SERVER_PID=$!
         echo "[eval] Server PID: $EVAL_SERVER_PID — waiting 60s for warmup..."
         sleep 60
